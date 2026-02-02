@@ -6,8 +6,6 @@ if (typeof global.crypto === 'undefined') {
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = require("@whiskeysockets/baileys");
-const qrcode = require('qrcode-terminal');
 
 const app = express();
 app.use(express.json());
@@ -25,6 +23,10 @@ let sock;
 // **Fungsi untuk memulai bot dengan sesi lokal**
 async function startBot() {
     console.log("🔄 Memulai WhatsApp bot...");
+
+    // Dynamic import untuk Baileys (ES Module)
+    const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = await import("@whiskeysockets/baileys");
+    const qrcode = (await import('qrcode-terminal')).default;
 
     // **Inisialisasi sesi lokal dengan MultiFileAuthState**
     const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session');
@@ -64,37 +66,34 @@ async function startBot() {
         }
     });
 
-    const { Boom } = require('@hapi/boom')
+    const { Boom } = await import('@hapi/boom');
 
     sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update
+        const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            console.log("\n📸 QR Code ditemukan — silakan scan:")
-            qrcode.generate(qr, { small: true })
+            console.log("\n📸 QR Code ditemukan — silakan scan:");
+            qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'open') {
-            console.log('✅ Bot berhasil terhubung ke WhatsApp')
+            console.log('✅ Bot berhasil terhubung ke WhatsApp');
         }
 
         if (connection === 'close') {
-            const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode
-            console.log("⚠️ Koneksi terputus, code:", statusCode)
+            const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+            console.log("⚠️ Koneksi terputus, code:", statusCode);
 
             if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                console.log("🚫 Session invalid, menghapus session & scan ulang QR")
-                const fs = require('fs')
-                fs.rmSync('./whatsapp-session', { recursive: true, force: true })
+                console.log("🚫 Session invalid, menghapus session & scan ulang QR");
+                const fs = require('fs');
+                fs.rmSync('./whatsapp-session', { recursive: true, force: true });
             }
 
-            console.log("🔁 Reconnecting...")
-            await startBot()
+            console.log("🔁 Reconnecting...");
+            await startBot();
         }
-    })
-
-
-    
+    });
 }
 
 // Jalankan bot

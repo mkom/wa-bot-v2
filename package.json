@@ -1,15 +1,27 @@
 {
   "name": "wa-bot-v2",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp Bot with Vercel and Upstash Redis integration",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node index.js",
+    "start": "node index.js",
+    "vercel-dev": "vercel dev"
   },
-  "keywords": [],
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "vercel",
+    "redis",
+    "upstash"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.1",
+    "@vercel/node": "^3.2.29",
     "@whiskeysockets/baileys": "^6.7.18",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -17,5 +29,8 @@
     "link-preview-js": "^3.1.0",
     "mongoose": "^8.10.0",
     "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
   }
 }
