@@ -1,22 +1,24 @@
-# WhatsApp Bot with Vercel and Upstash Redis
+# WhatsApp Bot with Vercel, Koyeb, or VPS
 
-A WhatsApp bot built with Baileys, deployed on Vercel with Upstash Redis for session caching, rate limiting, and **queue-based job processing**.
+A WhatsApp bot built with Baileys, deployable on **Vercel**, **Koyeb**, or **VPS**. Supports Redis for session caching, rate limiting, and **queue-based job processing**.
 
 ## Features
 
-- 🚀 **Vercel Serverless Deployment** - Deploy as Vercel Functions
-- 💾 **Redis Session Storage** - Use Upstash Redis instead of local files
+- 🚀 **Multiple Deployment Options** - Vercel, Koyeb, or VPS
+- 💾 **Redis Session Storage** - Use Upstash Redis for session caching
 - ⚡ **Rate Limiting** - Built-in rate limiting with @upstash/ratelimit
 - 🔄 **Queue System** - Cron job and on-demand job execution with Redis queue
 - 📊 **Job Management** - Track job status, retry failed jobs, and monitor queues
 - 🔄 **Health Monitoring** - Endpoints for monitoring bot and Redis status
-- 🎯 **Stateless Execution** - Bot connects, sends, and disconnects automatically
+- 📱 **QR Code via Browser** - Easy WhatsApp authentication via /qr endpoint
+- 🎯 **Always-On Mode** - Deploy on Koyeb or VPS for 24/7 bot operation
 
 ## Prerequisites
 
 1. **Node.js 18+** installed
-2. **Upstash Redis account** - [Sign up here](https://console.upstash.com/)
-3. **Vercel account** - [Sign up here](https://vercel.com/)
+2. **Upstash Redis account** (optional for Koyeb/VPS) - [Sign up here](https://console.upstash.com/)
+3. **Vercel account** (for Vercel deployment) - [Sign up here](https://vercel.com/)
+4. **Koyeb account** (for Koyeb deployment) - [Sign up here](https://koyeb.com/)
 
 ## Quick Start
 
@@ -52,7 +54,32 @@ npm run dev
 
 The bot will start and display a QR code for WhatsApp authentication.
 
-## Deployment to Vercel
+## Deployment Options
+
+Choose your preferred deployment method:
+
+### Option 1: Koyeb (Recommended - Free & Always-On)
+
+Koyeb provides a free tier that supports Docker containers and keeps your bot running 24/7.
+
+1. Push your code to GitHub
+2. Go to [Koyeb Dashboard](https://koyeb.com/)
+3. Create a new **Service** > Select **GitHub**
+4. Choose your repository
+5. Select **Docker** as the build method
+6. Add environment variables (if any)
+7. Set **Port** to `8888`
+8. Click **Deploy**
+
+After deployment:
+- Visit `/qr` endpoint to scan WhatsApp QR code
+- Visit `/status` to check bot connection status
+
+### Option 2: VPS (Oracle Cloud Free Tier)
+
+For maximum control and persistence, deploy on a VPS. See [docs/VPS_SETUP_GUIDE.md](docs/VPS_SETUP_GUIDE.md) for detailed instructions.
+
+### Option 3: Vercel (Serverless)
 
 ### Option 1: Vercel CLI
 
@@ -103,7 +130,7 @@ Once deployed, the following endpoints are available:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Health check with Redis status |
+| GET `/health` | Health check with Redis status |
 | GET | `/api` | API information |
 | POST | `/api/send` | Send a WhatsApp message |
 | POST | `/api/notify` | Send notification (compatible with local API) |
