@@ -6,6 +6,7 @@ if (typeof global.crypto === 'undefined') {
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const QRCode = require('qrcode');
 
 const app = express();
 app.use(express.json());
@@ -19,6 +20,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 let sock;
+let currentQR = null;
 
 /**
  * Get the appropriate auth directory
@@ -48,7 +50,7 @@ async function startBot() {
 
     sock = makeWASocket({
         version,
-        printQRInTerminal: true,
+        printQRInTerminal: false, // Deprecated, handle QR manually below
         auth: state
     });
 
@@ -85,7 +87,13 @@ async function startBot() {
 
         if (qr) {
             console.log("\n📸 QR Code ditemukan — silakan scan:");
-            qrcode.generate(qr, { small: true });
+            currentQR = qr;
+            // Try to generate terminal QR (works sometimes)
+            try {
+                qrcode.generate(qr, { small: true });
+            } catch(e) {
+                console.log("📸 QR Code tersedia di endpoint /qr");
+            }
         }
 
         if (connection === 'open') {
@@ -121,6 +129,34 @@ app.get('/status', (req, res) => {
 
     console.log(`🤖 Bot connected`);
     res.json({ status: 'connected' });
+});
+
+// **QR Code Endpoint - Untuk discan di browser**
+app.get('/qr', async (req, res) => {
+    if (!currentQR) {
+        return res.send('<h1>QR Code belum tersedia</h1><p>Tunggu sebentar atau restart bot untuk mendapatkan QR baru.</p>');
+    }
+    
+    try {
+        const qrImage = await QRCode.toDataURL(currentQR);
+        res.send(`
+            <html>
+                <head>
+                    <title>WA Bot QR Code</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                </head>
+                <body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f0f0f0;font-family:Arial,sans-serif;">
+                    <div style="text-align:center;background:white;padding:20px;border-radius:10px;box-shadow:0 2px10px rgba(0,0,0,0.1);">
+                        <h2>Scan QR ini dengan WhatsApp</h2>
+                        <p>Buka WhatsApp > Linked Devices > Link a Device</p>
+                        <img src="${qrImage}" alt="QR Code" style="width:300px;height:300px;">
+                    </div>
+                </body>
+            </html>
+        `);
+    } catch (error) {
+        res.status(500).send('Error generating QR: ' + error.message);
+    }
 });
 
 
