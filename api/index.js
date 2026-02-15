@@ -69,7 +69,18 @@ app.get('/api', (req, res) => {
     endpoints: {
       health: '/health',
       send: '/api/send',
+      notify: '/api/notify',
       sessions: '/api/sessions',
+      jobs: {
+        enqueue: '/api/jobs',
+        status: '/api/jobs/:jobId',
+        cancel: '/api/jobs/:jobId/cancel',
+        retry: '/api/jobs/:jobId/retry',
+        list: '/api/jobs/list/:status',
+        stats: '/api/jobs/stats',
+      },
+      worker: '/api/worker',
+      cron: '/api/cron',
     },
   });
 });
@@ -77,7 +88,7 @@ app.get('/api', (req, res) => {
 // Send message endpoint
 app.post('/api/send', async (req, res) => {
   try {
-    const { to, message, type = 'text' } = req.body;
+    const { to, message, type = 'text', usePipedream = false } = req.body;
 
     if (!to || !message) {
       return res.status(400).json({
@@ -85,19 +96,91 @@ app.post('/api/send', async (req, res) => {
       });
     }
 
-    // Import bot module dynamically to avoid initialization issues
-    const { sendMessage } = require('./bot');
-
-    const result = await sendMessage(to, message, type);
-    res.json({
-      success: true,
-      messageId: result?.key?.id,
-      status: 'sent',
-    });
+    // Check if Pipedream should be used
+    const pipedreamWebhookUrl = process.env.PIPEDREAM_WEBHOOK_URL;
+    
+    if (usePipedream && pipedreamWebhookUrl) {
+      // Use Pipedream for processing (hybrid mode)
+      const { enqueueJob, JobType } = require('../lib/queue');
+      
+      // Enqueue job
+      const jobId = await enqueueJob(JobType.SEND_MESSAGE, { to, message, type });
+      
+      // Trigger Pipedream
+      await triggerPipedream(pipedreamWebhookUrl, jobId);
+      
+      res.json({
+        success: true,
+        jobId,
+        status: 'queued',
+        message: 'Message queued for processing via Pipedream',
+      });
+    } else {
+      // Use local processing (Vercel only)
+      const { sendMessage } = require('./bot');
+      
+      const result = await sendMessage(to, message, type);
+      res.json({
+        success: true,
+        messageId: result?.key?.id,
+        status: 'sent',
+      });
+    }
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({
       error: 'Failed to send message',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Trigger Pipedream webhook
+ */
+async function triggerPipedream(webhookUrl, jobId) {
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId }),
+    });
+    console.log(`🚀 Pipedream triggered for job ${jobId}`);
+  } catch (error) {
+    console.error('Failed to trigger Pipedream:', error.message);
+  }
+}
+
+// Notify endpoint (compatible with local /api/notify)
+app.post('/api/notify', async (req, res) => {
+  try {
+    const { number, bodyMessage } = req.body;
+
+    if (!number || !bodyMessage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: number, bodyMessage',
+      });
+    }
+
+    // Format nomor
+    const formattedNumber = number.includes('@s.whatsapp.net') 
+      ? number 
+      : `${number}@s.whatsapp.net`;
+
+    const { sendMessage } = require('./bot');
+    const result = await sendMessage(formattedNumber, bodyMessage, 'text');
+
+    res.json({
+      success: true,
+      message: `Pesan berhasil dikirim ke ${number}`,
+      messageId: result?.key?.id,
+    });
+  } catch (error) {
+    console.error('Notify error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal mengirim pesan',
       details: error.message,
     });
   }
@@ -147,6 +230,211 @@ app.post('/api/webhook', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Webhook processing failed',
+      details: error.message,
+    });
+  }
+});
+
+// ===========================================
+// Job Management Endpoints
+// ===========================================
+
+// Enqueue a job
+app.post('/api/jobs', async (req, res) => {
+  try {
+    const { type, payload, options = {} } = req.body;
+
+    if (!type || !payload) {
+      return res.status(400).json({
+        error: 'Missing required fields: type, payload',
+      });
+    }
+
+    const { enqueueJob, JobType } = require('../lib/queue');
+
+    // Validate job type
+    if (!Object.values(JobType).includes(type)) {
+      return res.status(400).json({
+        error: `Invalid job type. Valid types: ${Object.values(JobType).join(', ')}`,
+      });
+    }
+
+    const jobId = await enqueueJob(type, payload, options);
+
+    res.json({
+      success: true,
+      jobId,
+      type,
+      status: 'pending',
+      message: 'Job enqueued successfully',
+    });
+  } catch (error) {
+    console.error('Enqueue job error:', error);
+    res.status(500).json({
+      error: 'Failed to enqueue job',
+      details: error.message,
+    });
+  }
+});
+
+// Get job status
+app.get('/api/jobs/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { getJobStatus } = require('../lib/queue');
+
+    const job = await getJobStatus(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        error: 'Job not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      job,
+    });
+  } catch (error) {
+    console.error('Get job status error:', error);
+    res.status(500).json({
+      error: 'Failed to get job status',
+      details: error.message,
+    });
+  }
+});
+
+// Cancel a job
+app.post('/api/jobs/:jobId/cancel', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { cancelJob } = require('../lib/queue');
+
+    const cancelled = await cancelJob(jobId);
+
+    if (!cancelled) {
+      return res.status(400).json({
+        error: 'Job not found or cannot be cancelled (only pending jobs can be cancelled)',
+      });
+    }
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Job cancelled successfully',
+    });
+  } catch (error) {
+    console.error('Cancel job error:', error);
+    res.status(500).json({
+      error: 'Failed to cancel job',
+      details: error.message,
+    });
+  }
+});
+
+// Retry a failed job
+app.post('/api/jobs/:jobId/retry', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { retryJob } = require('../lib/queue');
+
+    const retried = await retryJob(jobId);
+
+    if (!retried) {
+      return res.status(400).json({
+        error: 'Job not found or cannot be retried (only failed jobs can be retried)',
+      });
+    }
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Job queued for retry',
+    });
+  } catch (error) {
+    console.error('Retry job error:', error);
+    res.status(500).json({
+      error: 'Failed to retry job',
+      details: error.message,
+    });
+  }
+});
+
+// Get jobs by status
+app.get('/api/jobs/list/:status', async (req, res) => {
+  try {
+    const { status } = req.params;
+    const limit = parseInt(req.query.limit || '50', 10);
+    const { getJobsByStatus, JobStatus } = require('../lib/queue');
+
+    // Validate status
+    if (!Object.values(JobStatus).includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Valid statuses: ${Object.values(JobStatus).join(', ')}`,
+      });
+    }
+
+    const jobs = await getJobsByStatus(status, limit);
+
+    res.json({
+      success: true,
+      status,
+      count: jobs.length,
+      jobs,
+    });
+  } catch (error) {
+    console.error('Get jobs by status error:', error);
+    res.status(500).json({
+      error: 'Failed to get jobs',
+      details: error.message,
+    });
+  }
+});
+
+// Get queue statistics
+app.get('/api/jobs/stats', async (req, res) => {
+  try {
+    const { type } = req.query;
+    const { getQueueStats } = require('../lib/queue');
+    
+    const stats = await getQueueStats(type);
+    
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    console.error('Get queue stats error:', error);
+    res.status(500).json({
+      error: 'Failed to get queue statistics',
+      details: error.message,
+    });
+  }
+});
+
+// Worker endpoint - process jobs on-demand
+app.post('/api/worker', async (req, res) => {
+  try {
+    const worker = require('./worker');
+    await worker(req, res);
+  } catch (error) {
+    console.error('Worker error:', error);
+    res.status(500).json({
+      error: 'Worker failed',
+      details: error.message,
+    });
+  }
+});
+
+// Cron endpoint - trigger cron job manually
+app.post('/api/cron', async (req, res) => {
+  try {
+    const cron = require('./cron');
+    await cron(req, res);
+  } catch (error) {
+    console.error('Cron error:', error);
+    res.status(500).json({
+      error: 'Cron failed',
       details: error.message,
     });
   }

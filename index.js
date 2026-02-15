@@ -20,6 +20,14 @@ app.use(cors(corsOptions));
 
 let sock;
 
+/**
+ * Get the appropriate auth directory
+ * Uses local dir for persistent storage on VPS
+ */
+function getAuthDir() {
+  return './whatsapp-session';
+}
+
 // **Fungsi untuk memulai bot dengan sesi lokal**
 async function startBot() {
     console.log("🔄 Memulai WhatsApp bot...");
@@ -28,8 +36,12 @@ async function startBot() {
     const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = await import("@whiskeysockets/baileys");
     const qrcode = (await import('qrcode-terminal')).default;
 
+    // Get the appropriate auth directory
+    const authDir = getAuthDir();
+    console.log(`📁 Using auth directory: ${authDir}`);
+
     // **Inisialisasi sesi lokal dengan MultiFileAuthState**
-    const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session');
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
     let { version, isLatest } = await fetchLatestBaileysVersion();
     console.log(`📢 Menggunakan versi Baileys: ${version.join('.')}, Terbaru: ${isLatest}`);
@@ -94,6 +106,7 @@ async function startBot() {
             await startBot();
         }
     });
+
 }
 
 // Jalankan bot
