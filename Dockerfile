@@ -21,10 +21,9 @@ COPY . .
 # Create session directory
 RUN mkdir -p whatsapp-session
 
-# Expose the port
+# Expose the port (Koyeb will override this with PORT env var)
+ENV PORT=8888
 EXPOSE 8888
 
-# Use PM2 to manage the process
-RUN npm install -g pm2
-
-CMD ["pm2-runtime", "index.js"]
+# Run directly without PM2 for simpler container management on Koyeb
+CMD ["node", "index.js"]

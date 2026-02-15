@@ -147,6 +147,16 @@ app.post('/api/notify', async (req, res) => {
 
 // Jalankan server Express
 const PORT = process.env.PORT || 8888;
-app.listen(PORT, () => {
+
+// Health check route for Koyeb / Vercel
+app.get('/api', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        bot: sock ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server berjalan di port ${PORT}`);
 });
