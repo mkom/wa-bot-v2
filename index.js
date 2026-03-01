@@ -51,6 +51,9 @@ function cleanupSocket() {
     }
 }
 
+// Flag untuk force new session
+let forceNewSession = false;
+
 // **Fungsi untuk memulai bot dengan sesi Redis**
 async function startBot() {
     console.log("🔄 Memulai WhatsApp bot...");
@@ -65,6 +68,14 @@ async function startBot() {
 
     // **Inisialisasi sesi dari Redis**
     console.log('📡 Loading auth state from Redis...');
+    
+    // Jika force new session, clear dulu
+    if (forceNewSession) {
+        console.log('🆕 Forcing new session...');
+        await clearAuthState('main');
+        forceNewSession = false;
+    }
+    
     const { state, saveCreds } = await useRedisAuthState('main');
 
     let { version, isLatest } = await fetchLatestBaileysVersion();
@@ -133,6 +144,7 @@ async function startBot() {
                 await clearAuthState('main');
                 currentQR = null;
                 reconnectAttempts = 0;
+                forceNewSession = true; // Force new session on next start
                 
                 // Wait a bit then restart to get new QR
                 console.log("🔄 Restarting for new QR code scan...");
@@ -144,7 +156,9 @@ async function startBot() {
             if (statusCode === DisconnectReason.badSession) {
                 console.log("🚫 Bad session, clearing and reconnecting...");
                 await clearAuthState('main');
+                currentQR = null;
                 reconnectAttempts = 0;
+                forceNewSession = true;
                 reconnectTimer = setTimeout(() => startBot(), 3000);
                 return;
             }
@@ -278,6 +292,7 @@ app.post('/api/clear-session', async (req, res) => {
         await clearAuthState('main');
         currentQR = null;
         reconnectAttempts = 0;
+        forceNewSession = true;
         cleanupSocket();
         
         // Restart bot after clearing

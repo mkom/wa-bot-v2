@@ -31,14 +31,16 @@ async function resetSession() {
         // Also clear any old wa:session keys (legacy format)
         const oldSessionKeys = await redis.keys('wa:session:*');
         if (oldSessionKeys.length > 0) {
-            await redis.del(oldSessionKeys);
+            // Upstash Redis `del` expects variadic keys, not an array
+            await redis.del(...oldSessionKeys);
             console.log(`✅ Cleared ${oldSessionKeys.length} legacy session keys from Redis`);
         }
         
         // Clear baileys auth keys
         const baileysKeys = await redis.keys('baileys:auth:*');
         if (baileysKeys.length > 0) {
-            await redis.del(baileysKeys);
+            // Upstash Redis `del` expects variadic keys, not an array
+            await redis.del(...baileysKeys);
             console.log(`✅ Cleared ${baileysKeys.length} Baileys auth keys from Redis`);
         }
         
