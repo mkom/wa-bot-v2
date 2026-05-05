@@ -1,24 +1,20 @@
-# WhatsApp Bot with Vercel, Koyeb, or VPS
+# WhatsApp Bot with Koyeb / VPS
 
-A WhatsApp bot built with Baileys, deployable on **Vercel**, **Koyeb**, or **VPS**. Supports Redis for session caching, rate limiting, and **queue-based job processing**.
+A WhatsApp bot built with Baileys, deployable on **Koyeb** or **VPS**. Supports Redis for session persistence and 24/7 always-on operation.
 
 ## Features
 
-- 🚀 **Multiple Deployment Options** - Vercel, Koyeb, or VPS
-- 💾 **Redis Session Storage** - Use Upstash Redis for session caching
-- ⚡ **Rate Limiting** - Built-in rate limiting with @upstash/ratelimit
-- 🔄 **Queue System** - Cron job and on-demand job execution with Redis queue
-- 📊 **Job Management** - Track job status, retry failed jobs, and monitor queues
-- 🔄 **Health Monitoring** - Endpoints for monitoring bot and Redis status
-- 📱 **QR Code via Browser** - Easy WhatsApp authentication via /qr endpoint
-- 🎯 **Always-On Mode** - Deploy on Koyeb or VPS for 24/7 bot operation
+- 🚀 **Koyeb Deployment** - Free tier Docker container with 24/7 uptime
+- 💾 **Redis Session Storage** - Use Upstash Redis for session persistence
+- 📱 **QR Code via Browser** - Easy WhatsApp authentication via `/qr` endpoint
+- 🎯 **Always-On Mode** - Deploy on Koyeb or VPS for continuous bot operation
+- 🔄 **Auto Reconnect** - Exponential backoff reconnection on disconnect
 
 ## Prerequisites
 
 1. **Node.js 18+** installed
-2. **Upstash Redis account** (optional for Koyeb/VPS) - [Sign up here](https://console.upstash.com/)
-3. **Vercel account** (for Vercel deployment) - [Sign up here](https://vercel.com/)
-4. **Koyeb account** (for Koyeb deployment) - [Sign up here](https://koyeb.com/)
+2. **Upstash Redis account** - [Sign up here](https://console.upstash.com/)
+3. **Koyeb account** (for Koyeb deployment) - [Sign up here](https://koyeb.com/)
 
 ## Quick Start
 
@@ -54,11 +50,9 @@ npm run dev
 
 The bot will start and display a QR code for WhatsApp authentication.
 
-## Deployment Options
+## Deployment
 
-Choose your preferred deployment method:
-
-### Option 1: Koyeb (Recommended - Free & Always-On)
+### Koyeb (Recommended - Free & Always-On)
 
 Koyeb provides a free tier that supports Docker containers and keeps your bot running 24/7.
 
@@ -67,60 +61,20 @@ Koyeb provides a free tier that supports Docker containers and keeps your bot ru
 3. Create a new **Service** > Select **GitHub**
 4. Choose your repository
 5. Select **Docker** as the build method
-6. Add environment variables (if any)
+6. Add environment variables:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
 7. Set **Port** to `8888`
 8. Click **Deploy**
 
 After deployment:
 - Visit `/qr` endpoint to scan WhatsApp QR code
 - Visit `/status` to check bot connection status
+- Visit `/health` for health check (used by Koyeb)
 
-### Option 2: VPS (Oracle Cloud Free Tier)
+### VPS (Oracle Cloud Free Tier)
 
 For maximum control and persistence, deploy on a VPS. See [docs/VPS_SETUP_GUIDE.md](docs/VPS_SETUP_GUIDE.md) for detailed instructions.
-
-### Option 3: Vercel (Serverless)
-
-### Option 1: Vercel CLI
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login to Vercel
-vercel login
-
-# Link your project
-vercel link
-
-# Add environment variables
-vercel env add UPSTASH_REDIS_REST_URL
-vercel env add UPSTASH_REDIS_REST_TOKEN
-
-# Deploy to production
-vercel --prod
-```
-
-### Option 2: Vercel Dashboard
-
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Click "Add New Project"
-3. Import your GitHub repository
-4. Add environment variables:
-   - `UPSTASH_REDIS_REST_URL` (Secret)
-   - `UPSTASH_REDIS_REST_TOKEN` (Secret)
-5. Click "Deploy"
-
-### ⚠️ Important: Disable Vercel Authentication
-
-After deployment, you need to disable Vercel Authentication to allow API access:
-
-1. Go to your project in [Vercel Dashboard](https://vercel.com/dashboard)
-2. Navigate to **Settings** → **Protection**
-3. Disable **Vercel Authentication**
-4. Save changes
-
-This is required because the API endpoints need to be accessible without authentication for external integrations.
 
 ## API Endpoints
 
@@ -130,121 +84,54 @@ Once deployed, the following endpoints are available:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET `/health` | Health check with Redis status |
-| GET | `/api` | API information |
-| POST | `/api/send` | Send a WhatsApp message |
-| POST | `/api/notify` | Send notification (compatible with local API) |
-| GET | `/api/sessions` | List all sessions |
-| DELETE | `/api/sessions` | Clear all sessions |
-| POST | `/api/webhook` | Webhook for incoming messages |
-
-### Job Management Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/jobs` | Enqueue a new job |
-| GET | `/api/jobs/:jobId` | Get job status |
-| POST | `/api/jobs/:jobId/cancel` | Cancel a pending job |
-| POST | `/api/jobs/:jobId/retry` | Retry a failed job |
-| GET | `/api/jobs/list/:status` | List jobs by status |
-| GET | `/api/jobs/stats` | Get queue statistics |
-
-### Worker & Cron Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/worker` | Process jobs on-demand |
-| GET | `/api/cron` | Trigger cron job manually |
+| GET | `/health` | Health check with server and bot status |
+| GET | `/status` | Bot connection status |
+| GET | `/qr` | QR code page for WhatsApp authentication |
+| GET | `/api` | API information and bot status |
+| POST | `/api/notify` | Send a WhatsApp message |
+| POST | `/api/clear-session` | Clear session and restart bot |
 
 ### Example: Send a Message
 
 ```bash
-curl -X POST https://your-project.vercel.app/api/send \
-  -H "Content-Type: application/json" \
-  -d '{"to": "1234567890@s.whatsapp.net", "message": "Hello from the bot!"}'
-```
-
-### Example: Enqueue a Job
-
-```bash
-curl -X POST https://your-project.vercel.app/api/jobs \
+curl -X POST https://your-app.koyeb.app/api/notify \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "send_message",
-    "payload": {
-      "to": "1234567890@s.whatsapp.net",
-      "message": "Hello from queue!"
-    }
+    "number": "6281234567890",
+    "bodyMessage": "Hello from the bot!"
   }'
 ```
 
-### Example: Check Job Status
+### Example: Check Bot Status
 
 ```bash
-curl https://your-project.vercel.app/api/jobs/job_1234567890_abc123
+curl https://your-app.koyeb.app/status
 ```
 
-### Example: Get Queue Statistics
+### Example: Clear Session
 
 ```bash
-curl https://your-project.vercel.app/api/jobs/stats
-```
-
-## Queue System
-
-This bot includes a powerful queue system for cron job and on-demand execution. For detailed documentation, see [docs/QUEUE_SYSTEM.md](docs/QUEUE_SYSTEM.md).
-
-### Key Features
-
-- **Stateless Execution**: Bot connects, sends, and disconnects automatically
-- **Redis Queue**: Jobs stored in Upstash Redis with priority support
-- **Cron Jobs**: Automatic processing every 5 minutes (configurable)
-- **On-Demand Processing**: Trigger worker manually via API
-- **Job Types**: Send message, broadcast, scheduled message, custom
-- **Retry Logic**: Automatic retry with exponential backoff
-- **Status Tracking**: Monitor job status in real-time
-
-### Quick Start with Queue
-
-```bash
-# Enqueue a message job
-curl -X POST https://your-project.vercel.app/api/jobs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "send_message",
-    "payload": {
-      "to": "1234567890@s.whatsapp.net",
-      "message": "Hello from queue!"
-    }
-  }'
-
-# The job will be processed automatically by cron (every 5 minutes)
-# Or process immediately:
-curl -X POST https://your-project.vercel.app/api/worker \
-  -H "Content-Type: application/json" \
-  -d '{"action": "process", "count": 1}'
+curl -X POST https://your-app.koyeb.app/api/clear-session
 ```
 
 ## Project Structure
 
 ```
 wa-bot-v2/
-├── api/
-│   ├── index.js      # Main API handler (Vercel Functions)
-│   ├── bot.js        # WhatsApp bot logic
-│   ├── cron.js       # Cron job handler
-│   └── worker.js     # On-demand worker endpoint
 ├── lib/
-│   ├── redis.js      # Redis configuration & helpers
-│   ├── session.js    # Redis-based session storage
-│   ├── queue.js      # Queue system for job management
-│   └── job-handlers.js # Job processors
+│   ├── redis.js         # Redis configuration & helpers
+│   ├── session.js       # Redis-based session storage
+│   ├── baileys-redis-auth.js  # Baileys auth adapter for Redis
+│   ├── queue.js         # Queue system for job management
+│   └── email-notify.js  # Email notification helpers
 ├── docs/
-│   └── QUEUE_SYSTEM.md # Queue system documentation
-├── vercel.json       # Vercel configuration with cron jobs
-├── package.json      # Dependencies & scripts
-├── .env.example      # Environment variables template
-└── README.md         # This file
+│   ├── VPS_SETUP_GUIDE.md    # VPS deployment guide
+│   └── QUEUE_SYSTEM.md       # Queue system documentation
+├── Dockerfile          # Docker configuration for Koyeb
+├── package.json        # Dependencies & scripts
+├── .env.example        # Environment variables template
+├── index.js            # Main entry point (Express + Bot)
+└── README.md           # This file
 ```
 
 ## Environment Variables
@@ -253,47 +140,8 @@ wa-bot-v2/
 |----------|----------|-------------|
 | `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis REST Token |
-| `CRON_SECRET` | No | Secret to protect cron endpoints (recommended) |
-| `MAX_JOBS_PER_RUN` | No | Maximum jobs to process per cron run (default: 10) |
 | `NODE_ENV` | No | Environment (development/production) |
-| `PORT` | No | Port for local development (default: 3000) |
-
-## Limitations & Considerations
-
-### WhatsApp Bot on Vercel
-
-⚠️ **Important**: WhatsApp bots using Baileys require persistent WebSocket connections, which can be challenging with Vercel's serverless model:
-
-1. **Cold Starts**: The bot may experience delays on first request
-2. **Session Management**: Sessions are stored in Redis for persistence
-3. **WebSocket Limitations**: Long-running connections may time out
-
-### Queue System Architecture
-
-✅ **Solution**: This bot uses a queue-based architecture that works perfectly with Vercel:
-
-1. **Stateless Execution**: Bot connects, sends message, and disconnects immediately
-2. **No Persistent Connection**: No need to keep WebSocket open 24/7
-3. **Redis Queue**: Jobs are queued and processed on-demand or by cron
-4. **Automatic Retry**: Failed jobs are retried with exponential backoff
-5. **Session Persistence**: WhatsApp session is stored in Redis for 7 days
-
-### Recommended Production Setup
-
-For production WhatsApp bots, this queue-based architecture is ideal:
-
-- **Vercel**: Deploy API endpoints and cron jobs
-- **Upstash Redis**: Store sessions, queue data, and job status
-- **Pre-Auth**: Authenticate locally and save session to Redis
-- **Queue System**: Use cron jobs for scheduled processing or trigger on-demand
-
-### Pre-Authentication Process
-
-1. Run the bot locally: `npm run dev`
-2. Scan QR code with WhatsApp
-3. Session is automatically saved to Redis
-4. Deploy to Vercel - bot will use the saved session
-5. No need to scan QR code on Vercel
+| `PORT` | No | Port for server (default: 8888) |
 
 ## Troubleshooting
 
@@ -307,47 +155,26 @@ Make sure your Upstash credentials are correct and the database is active.
 ### Session Not Found
 
 ```
-📭 Session not found: main
+📭 No session found in Redis
 ```
 The session will be created automatically when you scan the QR code.
 
-### Rate Limited
+### Bot Not Connected
 
 ```
-429 Too Many Requests
+⚠️ Bot failed to start
 ```
-You're making too many requests. Wait a few seconds before trying again.
-
-### Jobs Not Processing
-
-1. Check cron job status in Vercel dashboard
-2. Verify Redis connection: `GET /health`
-3. Check queue stats: `GET /api/jobs/stats`
-4. Manually trigger worker: `POST /api/worker`
-
-### Bot Connection Issues
-
-1. Verify session exists in Redis
-2. Check session expiration (7 days TTL)
-3. Re-authenticate locally if session expired
-4. Check Upstash Redis status
+1. Check Redis connection
+2. Verify Upstash Redis status
+3. Check Koyeb logs for detailed error messages
+4. Try clearing session: `POST /api/clear-session`
 
 ### High Failure Rate
 
-1. Check job error messages
-2. Verify phone numbers are valid
-3. Check message content format
-4. Review rate limiting settings
-
-For more troubleshooting tips, see [docs/QUEUE_SYSTEM.md](docs/QUEUE_SYSTEM.md).
+1. Check if phone numbers are valid and registered on WhatsApp
+2. Verify message content format
+3. Review rate limiting settings
 
 ## License
 
 ISC
-
-## Support
-
-For issues and questions:
-- Open a GitHub issue
-- Check [docs/QUEUE_SYSTEM.md](docs/QUEUE_SYSTEM.md) for queue system documentation
-- Review [RECOMMENDATIONS.md](RECOMMENDATIONS.md) for best practices

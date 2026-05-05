@@ -200,8 +200,21 @@ async function startBot() {
 
 }
 
-// Jalankan bot
-startBot();
+// Jalankan bot with error handling - don't let bot failure crash the server
+startBot().catch(err => {
+    console.error('⚠️ Bot failed to start:', err.message);
+    console.log('💡 Server will still run, bot will retry automatically');
+});
+
+// Health check endpoint for Koyeb/Vercel - always returns 200 so platform knows app is running
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        server: 'running',
+        bot: sock?.user ? 'connected' : (sock ? 'connecting' : 'disconnected'),
+        timestamp: new Date().toISOString()
+    });
+});
 
 // **API Endpoint untuk Cek Status Bot**
 app.get('/status', (req, res) => {
@@ -263,24 +276,30 @@ app.get('/qr', async (req, res) => {
 
 
 app.post('/api/notify', async (req, res) => {
-    const { number, bodyMessage } = req.body;
-
-    // Pastikan socket sudah siap sebelum mengirim pesan
-    if (!sock || !sock.user) {
-        return res.status(500).json({ success: false, message: "Bot belum terhubung ke WhatsApp" });
-    }
-
-    // Format nomor agar sesuai dengan format internasional
-    const formattedNumber = number.includes('@s.whatsapp.net') ? number : `${number}@s.whatsapp.net`;
-
     try {
+        const { number, bodyMessage } = req.body;
+
+        if (!number || !bodyMessage) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: number, bodyMessage'
+            });
+        }
+
+        // Pastikan socket sudah siap sebelum mengirim pesan
+        if (!sock || !sock.user) {
+            return res.status(503).json({ success: false, message: "Bot belum terhubung ke WhatsApp" });
+        }
+
+        // Format nomor agar sesuai dengan format internasional
+        const formattedNumber = number.includes('@s.whatsapp.net') ? number : `${number}@s.whatsapp.net`;
+
         await sock.sendMessage(formattedNumber, { text: bodyMessage });
         res.json({ success: true, message: `Pesan berhasil dikirim ke ${number}` });
     } catch (error) {
         console.error("❌ Error mengirim pesan:", error);
         res.status(500).json({ success: false, message: "Gagal mengirim pesan", error: error.message });
     }
-
 });
 
 // Jalankan server Express
@@ -315,9 +334,26 @@ app.post('/api/clear-session', async (req, res) => {
     }
 });
 
+// Graceful shutdown handler for Koyeb deployments
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    cleanupSocket();
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    cleanupSocket();
+    process.exit(0);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server berjalan di port ${PORT}`);
-    console.log(`📍 Status: http://localhost:${PORT}/status`);
-    console.log(`📍 QR Code: http://localhost:${PORT}/qr`);
-    console.log(`📍 API: http://localhost:${PORT}/api`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📍 Available endpoints:`);
+    console.log(`   - GET  /health       (health check - Koyeb)`);
+    console.log(`   - GET  /status      (bot connection status)`);
+    console.log(`   - GET  /qr          (QR code for authentication)`);
+    console.log(`   - POST /api/notify  (send message)`);
+    console.log(`   - GET  /api         (combined status)`);
+    console.log(`   - POST /api/clear-session (reset session)`);
 });
