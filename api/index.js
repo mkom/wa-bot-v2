@@ -57,7 +57,7 @@ app.get('/status', (req, res) => {
   res.json({
     status: 'running',
     timestamp: new Date().toISOString(),
-    endpoints: ['/health', '/api', '/api/send', '/api/sessions'],
+    endpoints: ['/health', '/api', '/api/send', '/api/sessions', '/api/notify'],
   });
 });
 
@@ -198,6 +198,23 @@ app.get('/api/sessions', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Failed to get sessions',
+      details: error.message,
+    });
+  }
+});
+
+// Reconnect endpoint - force bot to reconnect
+app.post('/api/reconnect', async (req, res) => {
+  try {
+    const { startBot } = require('./bot');
+    await startBot();
+    res.json({
+      success: true,
+      message: 'Bot reconnect initiated',
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to reconnect',
       details: error.message,
     });
   }

@@ -8,6 +8,9 @@ const express = require('express');
 const cors = require('cors');
 const QRCode = require('qrcode');
 
+// Email notification module
+const { notifyBotDisconnected, notifyBotConnected } = require('./lib/email-notify');
+
 const app = express();
 app.use(express.json());
 
@@ -130,6 +133,11 @@ async function startBot() {
         if (connection === 'open') {
             console.log('✅ Bot berhasil terhubung ke WhatsApp');
             reconnectAttempts = 0; // Reset reconnect counter on successful connection
+            
+            // Send email notification on connect (optional)
+            if (process.env.SEND_EMAIL_ON_CONNECT === 'true') {
+                notifyBotConnected().catch(console.error);
+            }
         }
 
         if (connection === 'close') {
@@ -137,6 +145,9 @@ async function startBot() {
             const reason = lastDisconnect?.error?.message || 'Unknown';
             
             console.log(`⚠️ Koneksi terputus, code: ${statusCode}, reason: ${reason}`);
+
+            // Send email notification on disconnect
+            notifyBotDisconnected(reason, statusCode).catch(console.error);
 
             // Handle logged out - clear session and don't reconnect
             if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
